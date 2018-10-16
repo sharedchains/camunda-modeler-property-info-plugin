@@ -5,11 +5,15 @@ var _ = require('lodash');
 var $ = require('jquery');
 const shell = window.require('electron').shell;
 
+var ModelUtil = require('bpmn-js/lib/util/ModelUtil'),
+        is = ModelUtil.is;
+var extUtils = require('./ExtUtils')
+
 var elementOverlays = [];
 var overlaysVisible = true;
 
 function PropertyInfoPlugin(keyboard, eventBus, overlays, elementRegistry, editorActions) {
-    
+
     keyboard.addListener(function (key, modifiers) {
         if (key === 27 && $('div.doc-val-hover.showingPopup').length !== 0) {
             var element = $('div.doc-val-hover.showingPopup');
@@ -32,12 +36,29 @@ function PropertyInfoPlugin(keyboard, eventBus, overlays, elementRegistry, edito
         });
     });
 
+    eventBus.on('root.added', function (event) {
+      var element = event.element;
+      if (is(element.businessObject, 'bpmn:Process')){
+        extUtils.loadProcessParams(element);
+      }
+    });
+
     eventBus.on('shape.added', function (event) {
         _.defer(function () {
             changeShape(event);
         });
     });
 
+    eventBus.on('element.changed', function(event) {
+      var element = event.element;
+      if (is(element.businessObject, 'bpmn:Process')){
+        let value = extUtils.loadProcessParams(element);
+        if (overlaysVisible) {
+          overlaysVisible = false;
+          toggleOverlays();
+        }
+      }
+    });
 
     editorActions.register({
         togglePropertyOverlays: function () {
@@ -47,7 +68,7 @@ function PropertyInfoPlugin(keyboard, eventBus, overlays, elementRegistry, edito
 
     function changeShape(event) {
         var element = event.element;
-        if (!(element.businessObject.$instanceOf('bpmn:FlowNode') || element.businessObject.$instanceOf('bpmn:Participant'))) {
+        if (!(is(element.businessObject, 'bpmn:FlowNode') || is(element.businessObject, 'bpmn:Participant'))) {
             return;
         }
         _.defer(function () {
@@ -79,7 +100,7 @@ function PropertyInfoPlugin(keyboard, eventBus, overlays, elementRegistry, edito
             var elements = elementRegistry.getAll();
             for (var elementCount in elements) {
                 var elementObject = elements[elementCount];
-                if (elementObject.businessObject.$instanceOf('bpmn:FlowNode') || elementObject.businessObject.$instanceOf('bpmn:Participant')) {
+                if (is(element.businessObject, 'bpmn:FlowNode') || is(element.businessObject, 'bpmn:Participant')) {
                     addStyle(elementObject);
                 }
             }
@@ -105,11 +126,19 @@ function PropertyInfoPlugin(keyboard, eventBus, overlays, elementRegistry, edito
             text = text.replace(/(?:\r\n|\r|\n)/g, '<br />');
 
             var overlayHtml;
-            if (validUrl.isUri(text)) {
+            let folder = extUtils.getProcessParam('folderUrl');
+
+            if ((!!folder && /^((\/(.*))+)$/.test(text) && validUrl.isUri(folder + encodeURI(text)))
+              || validUrl.isUri(text)
+            ) {
+              if (folder.charAt(folder.length-1) == '/')  {
+                folder = folder.substr(0, folder.length-1);
+              }
               overlayHtml = $('<div class="doc-val-true" data-badge="D"></div>');
+              let urlExternal = (validUrl.isUri(text)? text: folder + encodeURI(text));
 
               overlayHtml.click(function(e) {
-                shell.openExternal(text);
+                shell.openExternal(urlExternal);
               });
             } else {
                 var overlayHtml = $('<div class="doc-val-true" data-badge="D"></div>');
@@ -142,7 +171,7 @@ function PropertyInfoPlugin(keyboard, eventBus, overlays, elementRegistry, edito
             }));
         }
 
-        if (element.businessObject.extensionElements === undefined && element.businessObject.$instanceOf('bpmn:FlowNode')) {
+        if (element.businessObject.extensionElements === undefined && is(element.businessObject, 'bpmn:FlowNode')) {
             return;
         }
 
@@ -157,7 +186,7 @@ function PropertyInfoPlugin(keyboard, eventBus, overlays, elementRegistry, edito
 
         var badges = [];
 
-        if(element.businessObject.$instanceOf('bpmn:Participant')) {
+        if(is(element.businessObject, 'bpmn:Participant')) {
             var extensionElements = element.businessObject.processRef.extensionElements;
             var extensions = (extensionElements === undefined ? [] : extensionElements.values);
 
