@@ -56,6 +56,9 @@ var _ = require('lodash');
 var $ = require('jquery');
 var validUrl = require('valid-url');
 
+var ModelUtil = require('bpmn-js/lib/util/ModelUtil'),
+    is = ModelUtil.is;
+
 var PropertiesActivator = require('bpmn-js-properties-panel/lib/PropertiesActivator');
 var entryFactory = require('bpmn-js-properties-panel/lib/factory/EntryFactory');
 var extUtils = require('../ExtUtils');
@@ -63,33 +66,33 @@ var extUtils = require('../ExtUtils');
 function ExtendedPropertiesProvider(eventBus, bpmnFactory, elementRegistry, elementTemplates, translate, propertiesProvider) {
   PropertiesActivator.call(this, eventBus);
 
-  this.getTabs = function (element) {
-    let tabs = propertiesProvider.getTabs(element);
+  let camundaGetTabs = propertiesProvider.getTabs;
+
+  propertiesProvider.getTabs = function (element) {
+    let tabs = camundaGetTabs(element);
     if (is(element.businessObject, 'bpmn:FlowNode') || is(element.businessObject, 'bpmn:Participant')) {
       let generalTab = _.find(tabs, { id: 'general' });
       let documentationGroup = _.find(generalTab.groups, { id: 'documentation' });
       let docField = _.find(documentationGroup.entries, { id: 'documentation' });
+      docField.validate = function (element, values, node) {
+        return !docField.get().documentation && element.businessObject.$attrs.isUriRelativePath ? { documentation: 'Must provide a documentation value as relative path to folderUrl property' } : {};
+      };
 
       let folder = extUtils.getProcessParam('folderUrl');
 
       let checkBoxEntry = entryFactory.checkbox({
         id: 'is-uri-relative-path',
-        description: 'Is URI relative path',
-        modelProperty: 'is-uri-relative-path'
-        // get: function (element) {
-        //   var res = {};
-        //   res['is-uri-relative-path'] = validUrl.isUri(folder + encodeURI(docField.text));
-        //   return res;
-        // },
-        // set: function (element, values) {
-        //
-        // }
+        label: 'Is URI relative path',
+        description: 'Documentation field is a relative path URI',
+        modelProperty: 'isUriRelativePath',
+        validate: function (element, values, node) {
+          return !docField.get().documentation && values.isUriRelativePath ? { isUriRelativePath: 'Must provide a documentation value as relative path to folderUrl property' } : {};
+        }
       });
       documentationGroup.entries.push(checkBoxEntry);
     }
     return tabs;
   };
-  propertiesProvider = this;
 }
 
 inherits(ExtendedPropertiesProvider, PropertiesActivator);
@@ -97,11 +100,11 @@ inherits(ExtendedPropertiesProvider, PropertiesActivator);
 ExtendedPropertiesProvider.$inject = ['eventBus', 'bpmnFactory', 'elementRegistry', 'elementTemplates', 'translate', 'propertiesProvider'];
 
 module.exports = {
-  __init__: ['extendedPropertiesProvider'],
-  extendedPropertiesProvider: ['type', ExtendedPropertiesProvider]
+  __init__: ['uriRelativePropertiesProvider'],
+  uriRelativePropertiesProvider: ['type', ExtendedPropertiesProvider]
 };
 
-},{"../ExtUtils":1,"bpmn-js-properties-panel/lib/PropertiesActivator":6,"bpmn-js-properties-panel/lib/factory/EntryFactory":9,"inherits":204,"jquery":205,"lodash":206,"valid-url":209}],4:[function(require,module,exports){
+},{"../ExtUtils":1,"bpmn-js-properties-panel/lib/PropertiesActivator":6,"bpmn-js-properties-panel/lib/factory/EntryFactory":9,"bpmn-js/lib/util/ModelUtil":202,"inherits":204,"jquery":205,"lodash":206,"valid-url":209}],4:[function(require,module,exports){
 'use strict';
 
 var validUrl = require('valid-url');
@@ -204,7 +207,7 @@ function PropertyInfoPlugin(keyboard, eventBus, overlays, elementRegistry, edito
             var elements = elementRegistry.getAll();
             for (var elementCount in elements) {
                 var elementObject = elements[elementCount];
-                if (is(element.businessObject, 'bpmn:FlowNode') || is(element.businessObject, 'bpmn:Participant')) {
+                if (is(elementObject.businessObject, 'bpmn:FlowNode') || is(elementObject.businessObject, 'bpmn:Participant')) {
                     addStyle(elementObject);
                 }
             }
@@ -223,15 +226,16 @@ function PropertyInfoPlugin(keyboard, eventBus, overlays, elementRegistry, edito
 
         if (element.businessObject.documentation !== undefined && element.businessObject.documentation.length > 0 && element.businessObject.documentation[0].text.trim() !== "" && element.type !== "label") {
 
+            var isUriRelativePath = element.businessObject.$attrs.isUriRelativePath || false;
             var text = element.businessObject.documentation[0].text;
             text = text.replace(/(?:\r\n|\r|\n)/g, '<br />');
 
             var overlayHtml;
             let folder = extUtils.getProcessParam('folderUrl');
 
-            if (!!folder && /^((\/(.*))+)$/.test(text) && validUrl.isUri(folder + encodeURI(text)) || validUrl.isUri(text)) {
-                if (folder.charAt(folder.length - 1) == '/') {
-                    folder = folder.substr(0, folder.length - 1);
+            if (isUriRelativePath && !!folder || validUrl.isUri(text)) {
+                if (folder.charAt(folder.length - 1) !== '/') {
+                    folder += '/';
                 }
                 overlayHtml = $('<div class="doc-val-true" data-badge="D"></div>');
                 let urlExternal = validUrl.isUri(text) ? text : folder + encodeURI(text);

@@ -100,7 +100,7 @@ function PropertyInfoPlugin(keyboard, eventBus, overlays, elementRegistry, edito
             var elements = elementRegistry.getAll();
             for (var elementCount in elements) {
                 var elementObject = elements[elementCount];
-                if (is(element.businessObject, 'bpmn:FlowNode') || is(element.businessObject, 'bpmn:Participant')) {
+                if (is(elementObject.businessObject, 'bpmn:FlowNode') || is(elementObject.businessObject, 'bpmn:Participant')) {
                     addStyle(elementObject);
                 }
             }
@@ -122,17 +122,17 @@ function PropertyInfoPlugin(keyboard, eventBus, overlays, elementRegistry, edito
             element.businessObject.documentation[0].text.trim() !== "" &&
             element.type !== "label"){
 
+            var isUriRelativePath = element.businessObject.$attrs.isUriRelativePath || false;
             var text = element.businessObject.documentation[0].text;
             text = text.replace(/(?:\r\n|\r|\n)/g, '<br />');
 
             var overlayHtml;
             let folder = extUtils.getProcessParam('folderUrl');
 
-            if ((!!folder && /^((\/(.*))+)$/.test(text) && validUrl.isUri(folder + encodeURI(text)))
-              || validUrl.isUri(text)
-            ) {
-              if (folder.charAt(folder.length-1) == '/')  {
-                folder = folder.substr(0, folder.length-1);
+            if ((isUriRelativePath && !!folder)
+            || validUrl.isUri(text)) {
+              if (folder.charAt(folder.length-1) !== '/')  {
+                folder += '/';
               }
               overlayHtml = $('<div class="doc-val-true" data-badge="D"></div>');
               let urlExternal = (validUrl.isUri(text)? text: folder + encodeURI(text));
@@ -141,24 +141,24 @@ function PropertyInfoPlugin(keyboard, eventBus, overlays, elementRegistry, edito
                 shell.openExternal(urlExternal);
               });
             } else {
-                var overlayHtml = $('<div class="doc-val-true" data-badge="D"></div>');
+              var overlayHtml = $('<div class="doc-val-true" data-badge="D"></div>');
 
-                overlayHtml.click(function (e) {
-                    var badge = $(this).siblings('.doc-val-hover');
-                    if (badge.length == 0) {
-                        $(this).after('<div class="doc-val-hover" data-badge="D">' + text + '</div>');
-                        badge = $(this).siblings('.doc-val-hover');
-                    }
-                    if ($(badge).is(":visible")) {
-                        $(badge).hide();
-                        $(badge).removeClass('showingPopup');
-                        keyboard.unbind();
-                    } else {
-                        $(badge).show();
-                        $(badge).addClass('showingPopup');
-                        keyboard.bind(document);
-                    }
-                });
+              overlayHtml.click(function (e) {
+                var badge = $(this).siblings('.doc-val-hover');
+                if (badge.length == 0) {
+                  $(this).after('<div class="doc-val-hover" data-badge="D">' + text + '</div>');
+                  badge = $(this).siblings('.doc-val-hover');
+                }
+                if ($(badge).is(":visible")) {
+                  $(badge).hide();
+                  $(badge).removeClass('showingPopup');
+                  keyboard.unbind();
+                } else {
+                  $(badge).show();
+                  $(badge).addClass('showingPopup');
+                  keyboard.bind(document);
+                }
+              });
             }
 
             elementOverlays[element.id].push(
