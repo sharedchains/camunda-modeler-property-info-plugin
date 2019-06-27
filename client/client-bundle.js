@@ -234,7 +234,7 @@ function PropertyInfoPlugin(keyboard, eventBus, overlays, elementRegistry, edito
             let folder = extUtils.getProcessParam('folderUrl');
 
             if (isUriRelativePath && !!folder || validUrl.isUri(text)) {
-                if (folder.charAt(folder.length - 1) !== '/') {
+                if (!!folder && folder.charAt(folder.length - 1) !== '/') {
                     folder += '/';
                 }
                 overlayHtml = $('<div class="doc-val-true" data-badge="D"></div>');
