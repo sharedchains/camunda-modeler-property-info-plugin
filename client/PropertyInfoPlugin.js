@@ -129,13 +129,12 @@ function PropertyInfoPlugin(keyboard, eventBus, overlays, elementRegistry, edito
             var overlayHtml;
             let folder = extUtils.getProcessParam('folderUrl');
 
-            if ((isUriRelativePath && !!folder)
-            || validUrl.isUri(text)) {
+            if ((isUriRelativePath && !!folder) || validUrl.isUri(text)) {
               if (!!folder && folder.charAt(folder.length-1) !== '/')  {
                 folder += '/';
               }
               overlayHtml = $('<div class="doc-val-true" data-badge="D"></div>');
-              let urlExternal = (validUrl.isUri(text)? text: folder + encodeURI(text));
+              let urlExternal = (validUrl.isUri(text)? text: (isUriRelativePath? folder + encodeURI(text): encodeURI(text)));
 
               overlayHtml.click(function(e) {
                 shell.openExternal(urlExternal);

@@ -238,7 +238,7 @@ function PropertyInfoPlugin(keyboard, eventBus, overlays, elementRegistry, edito
                     folder += '/';
                 }
                 overlayHtml = $('<div class="doc-val-true" data-badge="D"></div>');
-                let urlExternal = validUrl.isUri(text) ? text : folder + encodeURI(text);
+                let urlExternal = validUrl.isUri(text) ? text : isUriRelativePath ? folder + encodeURI(text) : encodeURI(text);
 
                 overlayHtml.click(function (e) {
                     shell.openExternal(urlExternal);
